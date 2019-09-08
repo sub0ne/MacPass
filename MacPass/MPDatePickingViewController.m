@@ -5,6 +5,20 @@
 //  Created by Michael Starke on 27.07.13.
 //  Copyright (c) 2013 HicknHack Software GmbH. All rights reserved.
 //
+//  This program is free software: you can redistribute it and/or modify
+//  it under the terms of the GNU General Public License as published by
+//  the Free Software Foundation, either version 3 of the License, or
+//  (at your option) any later version.
+//
+//  This program is distributed in the hope that it will be useful,
+//  but WITHOUT ANY WARRANTY; without even the implied warranty of
+//
+//  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+//  GNU General Public License for more details.
+//
+//  You should have received a copy of the GNU General Public License
+//  along with this program.  If not, see <http://www.gnu.org/licenses/>.
+//
 
 #import "MPDatePickingViewController.h"
 
@@ -23,7 +37,8 @@ typedef NS_ENUM(NSUInteger, MPDatePreset) {
 
 @interface MPDatePickingViewController ()
 
-@property (assign) BOOL didCancel;
+@property (nullable, weak) IBOutlet NSDatePicker *datePicker;
+@property (nullable, weak) IBOutlet NSPopUpButton *presetPopupButton;
 
 @end
 
@@ -36,9 +51,13 @@ typedef NS_ENUM(NSUInteger, MPDatePreset) {
 - (void)awakeFromNib {
   NSMenu *presetMenu = [[NSMenu alloc] init];
   NSUInteger tags[] = { MPDatePresetTomorrow, MPDatePresetOneWeek, MPDatePresetOneMonth, MPDatePreset90Days, MPDatePresetOneYear };
-  NSArray *dateItems = @[ NSLocalizedString(@"TOMORROW", ""), NSLocalizedString(@"ONE_WEEK", ""), NSLocalizedString(@"ONE_MONTH", ""), NSLocalizedString(@"90_DAYS", ""), NSLocalizedString(@"ONE_YEAR", "") ];
+  NSArray *dateItems = @[ NSLocalizedString(@"TOMORROW", "preset to expire tomorrow"),
+                          NSLocalizedString(@"ONE_WEEK", "preset to expire after one week from now"),
+                          NSLocalizedString(@"ONE_MONTH", "preset to expire after one montch from now"),
+                          NSLocalizedString(@"90_DAYS", "preset to expire after 90 days from now"),
+                          NSLocalizedString(@"ONE_YEAR", "preset to expire after one year from now") ];
   
-  NSMenuItem *item = [[NSMenuItem alloc] initWithTitle:NSLocalizedString(@"SELECT_DATE_PRESET", "") action:NULL keyEquivalent:@""];
+  NSMenuItem *item = [[NSMenuItem alloc] initWithTitle:NSLocalizedString(@"SELECT_DATE_PRESET", "Menu item title for the expiry preset selection menu in the date picker") action:NULL keyEquivalent:@""];
   item.tag = MPDatePresetNone;
   [presetMenu addItem:item];
   [presetMenu addItem:[NSMenuItem separatorItem]];
@@ -49,19 +68,26 @@ typedef NS_ENUM(NSUInteger, MPDatePreset) {
     [presetMenu addItem:item];
   }
   
-  self.datePicker.dateValue = [NSDate date];
+  self.datePicker.dateValue = self.representedObject ? [self.representedObject timeInfo].expirationDate : NSDate.date;
   self.presetPopupButton.menu = presetMenu;
 }
 
+- (void)setRepresentedObject:(id)representedObject {
+  [super setRepresentedObject:representedObject];
+  if(self.representedObject) {
+    self.datePicker.dateValue = [self.representedObject timeInfo].expirationDate;
+  }
+}
+
 - (IBAction)useDate:(id)sender {
-  self.didCancel = NO;
-  self.date = self.datePicker.dateValue;
-  [self.popover performClose:self];
+  [self.observer willChangeModelProperty];
+  [self.representedObject timeInfo].expirationDate = self.datePicker.dateValue;
+  [self.observer didChangeModelProperty];
+  [self dismissController:sender];
 }
 
 - (IBAction)cancel:(id)sender {
-  self.didCancel = YES;
-  [self.popover performClose:self];
+  [self dismissController:sender];
 }
 
 - (IBAction)setDatePreset:(id)sender {
@@ -89,8 +115,7 @@ typedef NS_ENUM(NSUInteger, MPDatePreset) {
     default:
       return; // Nothing to do;
   }
-  NSDate *newDate = [gregorian dateByAddingComponents:offsetComponents toDate:[NSDate date] options:0];
-  self.datePicker.dateValue = newDate;
+  self.datePicker.dateValue = [gregorian dateByAddingComponents:offsetComponents toDate:[NSDate date] options:0];
 }
 
 @end

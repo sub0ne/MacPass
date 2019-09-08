@@ -1,0 +1,24 @@
+/* Class = "NSTabViewItem"; label = "Group"; ObjectID = "2896"; */
+"2896.label" = "Grupo";
+
+/* Class = "NSTabViewItem"; label = "Entry"; ObjectID = "2897"; */
+"2897.label" = "Entrada";
+
+/* Class = "NSTabViewItem"; label = "NoSelection"; ObjectID = "2974"; */
+"2974.label" = "Sin selección";
+
+/* Class = "NSTextFieldCell"; title = "No Selection"; ObjectID = "2986"; */
+"2986.title" = "Sin selección";
+
+/* Class = "NSTextFieldCell"; title = "Label"; ObjectID = "3014"; */
+"3014.title" = "Etiqueta";
+
+/* Class = "NSTextFieldCell"; title = "Notes"; ObjectID = "hwn-UY-9Cr"; */
+"hwn-UY-9Cr.title" = "Notas";
+
+/* Class = "CocoaBindingsConnection"; ibShadowedIsNilPlaceholder = "None"; ObjectID = "Xpb-G8-gXl"; */
+"Xpb-G8-gXl.ibShadowedIsNilPlaceholder" = "Ninguno";
+
+/* Class = "CocoaBindingsConnection"; ibShadowedNoSelectionPlaceholder = "No Selection"; ObjectID = "Xpb-G8-gXl"; */
+"Xpb-G8-gXl.ibShadowedNoSelectionPlaceholder" = "Sin selección";
+

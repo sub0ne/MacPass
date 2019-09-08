@@ -5,12 +5,27 @@
 //  Created by Michael Starke on 09.03.13.
 //  Copyright (c) 2013 HicknHack Software GmbH. All rights reserved.
 //
+//  This program is free software: you can redistribute it and/or modify
+//  it under the terms of the GNU General Public License as published by
+//  the Free Software Foundation, either version 3 of the License, or
+//  (at your option) any later version.
+//
+//  This program is distributed in the hope that it will be useful,
+//  but WITHOUT ANY WARRANTY; without even the implied warranty of
+//
+//  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+//  GNU General Public License for more details.
+//
+//  You should have received a copy of the GNU General Public License
+//  along with this program.  If not, see <http://www.gnu.org/licenses/>.
+//
 
 #import "MPActionHelper.h"
 #import "MPDocument.h"
 #import "MPEntryInspectorViewController.h"
 #import "MPEntryViewController.h"
 #import "MPDocumentWindowController.h"
+#import "MPIconSelectViewController.h"
 
 @implementation MPActionHelper
 
@@ -23,9 +38,13 @@
                    @(MPActionAddGroup):                         NSStringFromSelector(@selector(createGroup:)),
                    @(MPActionDuplicateEntry):                   NSStringFromSelector(@selector(duplicateEntry:)),
                    @(MPActionDuplicateEntryWithOptions):        NSStringFromSelector(@selector(duplicateEntryWithOptions:)),
+                   @(MPActionDuplicateGroup):                   NSStringFromSelector(@selector(duplicateGroup:)),
+                   @(MPActionReverToHistoryEntry):              NSStringFromSelector(@selector(revertToHistoryEntry:)),
                    @(MPActionCopyPassword):                     NSStringFromSelector(@selector(copyPassword:)),
                    @(MPActionCopyURL):                          NSStringFromSelector(@selector(copyURL:)),
                    @(MPActionCopyUsername):                     NSStringFromSelector(@selector(copyUsername:)),
+                   @(MPActionCopyCustomAttribute):              NSStringFromSelector(@selector(copyCustomAttribute:)),
+                   @(MPActionCopyAsReference):                  NSStringFromSelector(@selector(copyAsReference:)),
                    @(MPActionDelete):                           NSStringFromSelector(@selector(delete:)),
                    @(MPActionEditPassword):                     NSStringFromSelector(@selector(editPassword:)),
                    @(MPActionOpenURL):                          NSStringFromSelector(@selector(openURL:)),
@@ -37,9 +56,11 @@
                    @(MPActionExportXML):                        NSStringFromSelector(@selector(exportAsXML:)),
                    @(MPActionImportXML):                        NSStringFromSelector(@selector(importFromXML:)),
                    @(MPActionToggleQuicklook):                  NSStringFromSelector(@selector(toggleQuicklookPreview:)),
-                   @(MPActionShowHistory):                      NSStringFromSelector(@selector(showHistory:)),
-                   @(MPActionExitHistory):                      NSStringFromSelector(@selector(exitHistory:)),
-                   @(MPActionPerformAutotypeForSelectedEntry):  NSStringFromSelector(@selector(performAutotypeForEntry:))
+                   @(MPActionShowEntryHistory):                 NSStringFromSelector(@selector(showEntryHistory:)),
+                   @(MPActionHideEntryHistory):                 NSStringFromSelector(@selector(hideEntryHistory:)),
+                   @(MPActionShowGroupInOutline):               NSStringFromSelector(@selector(showGroupInOutline:)),
+                   @(MPActionPerformAutotypeForSelectedEntry):  NSStringFromSelector(@selector(performAutotypeForEntry:)),
+                   @(MPActionRemoveAttachment):                 NSStringFromSelector(@selector(removeAttachment:))
                    };
   });
   return actionDict;

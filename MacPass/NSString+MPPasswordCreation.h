@@ -5,6 +5,20 @@
 //  Created by Michael Starke on 29.03.13.
 //  Copyright (c) 2013 HicknHack Software GmbH. All rights reserved.
 //
+//  This program is free software: you can redistribute it and/or modify
+//  it under the terms of the GNU General Public License as published by
+//  the Free Software Foundation, either version 3 of the License, or
+//  (at your option) any later version.
+//
+//  This program is distributed in the hope that it will be useful,
+//  but WITHOUT ANY WARRANTY; without even the implied warranty of
+//
+//  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+//  GNU General Public License for more details.
+//
+//  You should have received a copy of the GNU General Public License
+//  along with this program.  If not, see <http://www.gnu.org/licenses/>.
+//
 
 #import <Foundation/Foundation.h>
 
@@ -28,7 +42,8 @@ typedef NS_OPTIONS(NSUInteger, MPPasswordCharacterFlags) {
 */
 + (NSString *)passwordWithCharactersets:(MPPasswordCharacterFlags)allowedCharacters
                    withCustomCharacters:(NSString*)customCharacters
-                                 length:(NSUInteger)theLength;
+                            ensureOccurence:(BOOL)ensureOccurence
+                                 length:(NSUInteger)length;
 /**
  *  Creats a password based on the supplied string
  *
@@ -40,6 +55,17 @@ typedef NS_OPTIONS(NSUInteger, MPPasswordCharacterFlags) {
 + (NSString *)passwordFromString:(NSString *)source length:(NSUInteger)length;
 
 + (NSString *)passwordWithDefaultSettings;
+
++ (NSUInteger)minimumPasswordLengthWithCharacterSet:(MPPasswordCharacterFlags)characterSet customCharacters:(NSString *)customCharacter ensureOccurance:(BOOL)ensureOccurance;
+/**
+ *  @return returns a random character from the string
+ */
+@property (nonatomic, readonly, copy) NSString *randomCharacter;
+/**
+ * @return returns a shuffled copy of the receiving string
+ */
+@property (nonatomic, readonly, copy) NSString *shuffledString;
+
 /**
  *
  *  Creates a random password with only the characters of the receiver
@@ -50,19 +76,15 @@ typedef NS_OPTIONS(NSUInteger, MPPasswordCharacterFlags) {
  */
 - (NSString *)passwordWithLength:(NSUInteger)length;
 /**
- *  @return returns a random character from the string
- */
-- (NSString *)randomCharacter;
-/**
  *  Calculates the entropy of the receiver based on the allowed characters. The calculation considers the characters chosen randomly.
  *  If the password supplied was not created randomly based on the full character set, the calculated entropy is NOT correct.
- *  Do NOT use this method to estimate unknown passwords
+ *  Do NOT use this method to estimate passwords with unknown alphabet
  *
  *  @param allowedCharacters set of allowed Characters
- *  @param customCharacters  alternative string of unique allowed characters (String is not stripped of duplicates!)
+ *  @param customCharacters  additional custom string of allowed characters.
  *
  *  @return entropy of the receiver as bits
  */
-- (CGFloat)entropyWhithPossibleCharacterSet:(MPPasswordCharacterFlags)allowedCharacters orCustomCharacters:(NSString *)customCharacters;
+- (CGFloat)entropyWhithCharacterSet:(MPPasswordCharacterFlags)characterSet customCharacters:(NSString *)customCharacters ensureOccurance:(BOOL)ensureOccurance;
 
 @end

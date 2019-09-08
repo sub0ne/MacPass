@@ -1,0 +1,24 @@
+/* Class = "NSTextFieldCell"; title = "Autotype Sequence"; ObjectID = "6FG-UZ-Adh"; */
+"6FG-UZ-Adh.title" = "Secuencia de Auto tecleo";
+
+/* Class = "NSTextFieldCell"; title = "Name"; ObjectID = "25"; */
+"25.title" = "Nombre";
+
+/* Class = "NSButtonCell"; title = "Expires"; ObjectID = "32"; */
+"32.title" = "Expira";
+
+/* Class = "NSMenu"; title = "OtherViews"; ObjectID = "231"; */
+"231.title" = "Otras Vistas";
+
+/* Class = "NSMenu"; title = "OtherViews"; ObjectID = "243"; */
+"243.title" = "Otras Vistas";
+
+/* Class = "NSTextFieldCell"; title = "Search"; ObjectID = "265"; */
+"265.title" = "Buscar";
+
+/* Class = "NSTextFieldCell"; title = "Autotype"; ObjectID = "277"; */
+"277.title" = "Autotecleo";
+
+/* Class = "NSButtonCell"; title = "Show Plugin Data"; ObjectID = "qGr-oT-WjP"; */
+"qGr-oT-WjP.title" = "Mostrar datos del plugin";
+

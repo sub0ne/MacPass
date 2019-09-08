@@ -51,15 +51,15 @@ NSString *const _MPOutlineMenuTemplate = @"Template";
    */
   
   id item = [self.viewController itemUnderMouse];
-  if( [item isKindOfClass:[KPKTree class]]) {
+  if( [item isKindOfClass:KPKTree.class]) {
     [self _updateRootMenu:menu];
   }
   
-  if( [item isKindOfClass:[KPKGroup class]]) {
+  if( [item isKindOfClass:KPKGroup.class]) {
     KPKGroup *group = (KPKGroup *)item;
-    MPDocument *document = [[NSDocumentController sharedDocumentController] currentDocument];
+    MPDocument *document = NSDocumentController.sharedDocumentController.currentDocument;
     if(group && document.root == group ) {
-
+      
     }
     if(group.isTrash) {
       [self _updateTrashMenu:menu];
@@ -77,67 +77,67 @@ NSString *const _MPOutlineMenuTemplate = @"Template";
 }
 
 - (void)_updateRootMenu:(NSMenu *)menu {
-  if([[menu title] isEqualToString:_MPOutlineMenuRoot]) {
+  if([menu.title isEqualToString:_MPOutlineMenuRoot]) {
     return; // nothing to do, all fine
   }
   [menu removeAllItems];
-  [menu addItemWithTitle:NSLocalizedString(@"CHANGE_DATABASE_NAME", "")
+  [menu addItemWithTitle:NSLocalizedString(@"CHANGE_DATABASE_NAME", "Menu item in the database outline context menu to change the database name")
                   action:[MPActionHelper actionOfType:MPActionDatabaseSettings]
            keyEquivalent:@""];
   
-  [menu setTitle:_MPOutlineMenuRoot];
+  menu.title = _MPOutlineMenuRoot;
 }
 
 - (void)_updateTrashMenu:(NSMenu *)menu {
-  if([[menu title] isEqualToString:_MPOutlineMenuTrash]) {
+  if([menu.title isEqualToString:_MPOutlineMenuTrash]) {
     return; // nothing to do, all fine
   }
   [menu removeAllItems];
-  [menu addItemWithTitle:NSLocalizedString(@"CHANGE_TRASH_GROUP", "")
+  [menu addItemWithTitle:NSLocalizedString(@"CHANGE_TRASH_GROUP", "Menu item in the database outline context menu to change the trash group")
                   action:@selector(editTrashGroup:)
            keyEquivalent:@""];
   [menu addItem:[NSMenuItem separatorItem]];
-  [menu addItemWithTitle:NSLocalizedString(@"EMPTY_TRASH", "")
+  [menu addItemWithTitle:NSLocalizedString(@"EMPTY_TRASH", "Menu item in the database outline context menu to empyt the trash")
                   action:[MPActionHelper actionOfType:MPActionEmptyTrash]
            keyEquivalent:@""];
   
-  [menu setTitle:_MPOutlineMenuTrash];
+  menu.title = _MPOutlineMenuTrash;
 }
 
 - (void)_updateTrashItemMenu:(NSMenu *)menu {
-  if([[menu title] isEqualToString:_MPOutlineMenuTrashItem]) {
+  if([menu.title isEqualToString:_MPOutlineMenuTrashItem]) {
     return; // nothing to do, all fine
   }
   [menu removeAllItems];
-  [menu addItemWithTitle:NSLocalizedString(@"DELETE", "")
+  [menu addItemWithTitle:NSLocalizedString(@"DELETE", "Menu item in the database outline context menu to delete the node from the trash")
                   action:[MPActionHelper actionOfType:MPActionDelete]
            keyEquivalent:@""];
   [menu addItem:[NSMenuItem separatorItem]];
-  [menu addItemWithTitle:NSLocalizedString(@"EMPTY_TRASH", "")
+  [menu addItemWithTitle:NSLocalizedString(@"EMPTY_TRASH", "Menu item in the database outline to empty the trash")
                   action:[MPActionHelper actionOfType:MPActionEmptyTrash]
            keyEquivalent:@""];
   
-  [menu setTitle:_MPOutlineMenuTrashItem];
+  menu.title = _MPOutlineMenuTrashItem;
 }
 
 - (void)_updateTemplateMenu:(NSMenu *)menu {
-  if([[menu title] isEqualToString:_MPOutlineMenuTemplate]) {
+  if([menu.title isEqualToString:_MPOutlineMenuTemplate]) {
     return; // nothing to do, all fine
   }
   [menu removeAllItems];
-  [menu addItemWithTitle:NSLocalizedString(@"EDIT_TEMPLATE_GROUP", "")
+  [menu addItemWithTitle:NSLocalizedString(@"EDIT_TEMPLATE_GROUP", "Menu item in the database outline context menu to change the template group")
                   action:[MPActionHelper actionOfType:MPActionEditTemplateGroup]
            keyEquivalent:@""];
   [menu addItem:[NSMenuItem separatorItem]];
   for(NSMenuItem *item in [MPContextMenuHelper contextMenuItemsWithItems:MPContextMenuMinimal]) {
     [menu addItem:item];
   }
-  [menu setTitle:_MPOutlineMenuTemplate];
+  menu.title = _MPOutlineMenuTemplate;
 }
 
 
 - (void)_updateDefaultMenu:(NSMenu *)menu {
-  if([[menu title] isEqualToString:_MPOutlineMenuDefault]) {
+  if([menu.title isEqualToString:_MPOutlineMenuDefault]) {
     return; // nothing to do, all fine
   }
   [menu removeAllItems];

@@ -5,6 +5,20 @@
 //  Created by Michael Starke on 10.08.13.
 //  Copyright (c) 2013 HicknHack Software GmbH. All rights reserved.
 //
+//  This program is free software: you can redistribute it and/or modify
+//  it under the terms of the GNU General Public License as published by
+//  the Free Software Foundation, either version 3 of the License, or
+//  (at your option) any later version.
+//
+//  This program is distributed in the hope that it will be useful,
+//  but WITHOUT ANY WARRANTY; without even the implied warranty of
+//
+//  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+//  GNU General Public License for more details.
+//
+//  You should have received a copy of the GNU General Public License
+//  along with this program.  If not, see <http://www.gnu.org/licenses/>.
+//
 
 #import "MPPasswordEditWindowController.h"
 #import "MPDocument.h"
@@ -31,7 +45,6 @@
 - (id)initWithWindow:(NSWindow *)window {
   self = [super initWithWindow:window];
   if(self){
-    //_allowsEmptyPasswordOrKey = YES;
     _showPassword = NO;
     _hasValidPasswordOrKey = NO;
   }
@@ -41,7 +54,7 @@
 - (void)windowDidLoad {
   [super windowDidLoad];
   [self.togglePasswordButton bind:NSValueBinding toObject:self withKeyPath:NSStringFromSelector(@selector(showPassword)) options:nil];
-  [[self window] setDefaultButtonCell:[self.changePasswordButton cell]];
+  self.window.defaultButtonCell = self.changePasswordButton.cell;
   MPDocument *document = self.document;
   self.enablePassword = document.compositeKey.hasPassword;
 }
@@ -68,8 +81,8 @@
   [self.changePasswordButton bind:NSEnabledBinding toObject:self withKeyPath:hasValidPasswordOrKeyKeyPath options:nil];
   [self.keyfilePathControl bind:NSValueBinding toObject:self withKeyPath:NSStringFromSelector(@selector(keyURL)) options:nil];
   
-  [self.passwordRepeatTextField setDelegate:self];
-  [self.passwordTextField setDelegate:self];
+  self.passwordRepeatTextField.delegate = self;
+  self.passwordTextField.delegate = self;
   
   /* Manually initate the first check */
   [self _verifyPasswordAndKey];
@@ -81,7 +94,7 @@
   if(_showPassword != showPassword) {
     _showPassword = showPassword;
     
-    [self.passwordRepeatTextField setStringValue:@""];
+    self.passwordRepeatTextField.stringValue = @"";
     [self _verifyPasswordAndKey];
   }
 }
@@ -93,29 +106,23 @@
   if(_enablePassword != enablePassword) {
     _enablePassword = enablePassword;
   }
-  NSString *passwordPlaceHolder = _enablePassword ? NSLocalizedString(@"PASSWORD_INPUT_ENTER_PASSWORD", "") : NSLocalizedString(@"PASSWORD_INPUT_NO_PASSWORD", "");
-  NSString *repeatPlaceHolder = _enablePassword ? NSLocalizedString(@"PASSWORD_INPUT_REPEAT_PASSWORD", "") : NSLocalizedString(@"PASSWORD_INPUT_NO_PASSWORD", "");
-  [[self.passwordTextField cell] setPlaceholderString:passwordPlaceHolder];
-  [[self.passwordRepeatTextField cell] setPlaceholderString:repeatPlaceHolder];
+  NSString *passwordPlaceHolder = _enablePassword ? NSLocalizedString(@"PASSWORD_INPUT_ENTER_PASSWORD", "Placeholder for the password field to aks for password") : NSLocalizedString(@"PASSWORD_INPUT_NO_PASSWORD", "Placeholder for the password input field if passwords are disabled");
+  NSString *repeatPlaceHolder = _enablePassword ? NSLocalizedString(@"PASSWORD_INPUT_REPEAT_PASSWORD", "Placeholder for the repeat password field to aks for the repeated password") : NSLocalizedString(@"PASSWORD_INPUT_NO_PASSWORD", "Placeholder for the repeat password input if passwords are disabled");
+  self.passwordTextField.placeholderString = passwordPlaceHolder;
+  self.passwordRepeatTextField.placeholderString = repeatPlaceHolder;
 }
 
 #pragma mark Actions
 - (IBAction)save:(id)sender {
-  const BOOL hasPassword = ([self.hasPasswordSwitchButton state] == NSOnState);
-  NSString *password = hasPassword ? [self.passwordTextField stringValue] : nil;
+  const BOOL hasPassword = HNHUIBoolForState(self.hasPasswordSwitchButton.state);
+  NSString *password = hasPassword ? self.passwordTextField.stringValue : nil;
   MPDocument *document = self.document;
-  [document changePassword:password keyFileURL:[self.keyfilePathControl URL]];
-  [self dismissSheet:NSRunStoppedResponse];
-  if(self.delegate && [self.delegate respondsToSelector:@selector(didFinishPasswordEditing:)]) {
-    [self.delegate didFinishPasswordEditing:YES];
-  }
+  [document changePassword:password keyFileURL:self.keyfilePathControl.URL];
+  [self dismissSheet:NSModalResponseOK];
 }
 
 - (IBAction)cancel:(id)sender {
-  [self dismissSheet:NSRunAbortedResponse];
-  if(self.delegate && [self.delegate respondsToSelector:@selector(didFinishPasswordEditing:)]) {
-    [self.delegate didFinishPasswordEditing:NO];
-  }
+  [self dismissSheet:NSModalResponseCancel];
 }
 
 - (IBAction)clearKey:(id)sender {
@@ -124,12 +131,12 @@
 
 - (IBAction)generateKey:(id)sender {
   MPDocument *document = self.document;
-  NSData *data = [NSData generateKeyfiledataForVersion:document.tree.minimumVersion];
+  NSData *data = [NSData kpk_generateKeyfileDataForFormat:document.tree.minimumVersion.format];
   if(data) {
     NSSavePanel *savePanel = [NSSavePanel savePanel];
-    [savePanel setAllowedFileTypes:@[@"key", @"xml"]];
-    [savePanel setCanCreateDirectories:YES];
-    [savePanel setTitle:NSLocalizedString(@"SAVE_KEYFILE", "")];
+    savePanel.allowedFileTypes = @[@"key", @"xml"];
+    savePanel.canCreateDirectories = YES;
+    savePanel.title = NSLocalizedString(@"SAVE_KEYFILE", "Button title to save the generated key file");
     [savePanel beginWithCompletionHandler:^(NSInteger result) {
       if(result == NSFileHandlingPanelOKButton) {
         NSURL *keyURL = [savePanel URL];
@@ -149,16 +156,16 @@
 }
 
 - (void)_verifyPasswordAndKey {
-  NSString *password = [self.passwordTextField stringValue];
-  NSString *repeat = [self.passwordRepeatTextField stringValue];
+  NSString *password = self.passwordTextField.stringValue;
+  NSString *repeat = self.passwordRepeatTextField.stringValue;
   BOOL hasKey = (self.keyURL != nil);
   BOOL keyOk = YES;
   if(hasKey) {
     keyOk = [self.keyURL checkResourceIsReachableAndReturnError:nil];
   }
-  BOOL hasPassword = ![NSString isEmptyString:password];
+  BOOL hasPassword = password.kpk_isNotEmpty;
   if(!self.showPassword) {
-    hasPassword |= ![NSString isEmptyString:repeat];
+    hasPassword |= repeat.kpk_isNotEmpty;
   }
   BOOL passwordOk = YES;
   if(hasPassword ) {
@@ -170,19 +177,19 @@
   self.hasValidPasswordOrKey = hasPasswordOrKey && passwordOk && keyOk;
   
   if(!hasPasswordOrKey) {
-    [self.errorTextField setTextColor:[NSColor controlTextColor]];
-    [self.errorTextField setStringValue:NSLocalizedString(@"WARNING_NO_PASSWORD_OR_KEYFILE", "No Key or Password")];
+    self.errorTextField.textColor = NSColor.controlTextColor;
+    self.errorTextField.stringValue = NSLocalizedString(@"WARNING_NO_PASSWORD_OR_KEYFILE", "No Key or Password");
     return; // all done
   }
-  [self.errorTextField setTextColor:[NSColor redColor]];
+  self.errorTextField.textColor = NSColor.redColor;
   if(!passwordOk && !keyOk ) {
-    [self.errorTextField setStringValue:NSLocalizedString(@"ERROR_PASSWORD_MISSMATCH_INVALID_KEYFILE", "Passwords do not match, keyfile is invalid")];
+    self.errorTextField.stringValue = NSLocalizedString(@"ERROR_PASSWORD_MISSMATCH_INVALID_KEYFILE", "Passwords do not match, keyfile is invalid");
   }
   else if(!passwordOk) {
-    [self.errorTextField setStringValue:NSLocalizedString(@"ERROR_PASSWORD_MISSMATCH", "Passwords do not match")];
+    self.errorTextField.stringValue = NSLocalizedString(@"ERROR_PASSWORD_MISSMATCH", "Passwords do not match");
   }
   else {
-    [self.errorTextField setStringValue:NSLocalizedString(@"ERROR_INVALID_KEYFILE", "Keyfile not valid")];
+    self.errorTextField.stringValue = NSLocalizedString(@"ERROR_INVALID_KEYFILE", "Keyfile not valid");
   }
 }
 

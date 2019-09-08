@@ -24,6 +24,7 @@
 #import <KeePassKit/KeePassKit.h>
 #import "MPEntrySearchContext.h"
 #import "MPTargetNodeResolving.h"
+#import "MPModelChangeObserving.h"
 
 /**
  *  Posted when a new group was added to the document.
@@ -31,23 +32,30 @@
  *  Undo/Redo will not cause this notification to be reposted
  *  The userInfo dictionary contains the added group at MPDocumentGroupKey
  */
-APPKIT_EXTERN NSString *const MPDocumentDidAddGroupNotification;
+FOUNDATION_EXPORT NSString *const MPDocumentDidAddGroupNotification;
 /**
  *  Posted when the user has added a new entry to the document.
  *  Undo/redo will not cause this notification to be reposted.
  *  The userInfo dictionary contains the added entry at MPDocumentEntryKey
  */
-APPKIT_EXTERN NSString *const MPDocumentDidAddEntryNotification;
-APPKIT_EXTERN NSString *const MPDocumentDidRevertNotifiation;
+FOUNDATION_EXPORT NSString *const MPDocumentDidAddEntryNotification;
+FOUNDATION_EXPORT NSString *const MPDocumentDidRevertNotifiation;
 
-APPKIT_EXTERN NSString *const MPDocumentDidLockDatabaseNotification;
-APPKIT_EXTERN NSString *const MPDocumentDidUnlockDatabaseNotification;
+FOUNDATION_EXPORT NSString *const MPDocumentDidLockDatabaseNotification;
+FOUNDATION_EXPORT NSString *const MPDocumentDidUnlockDatabaseNotification;
 
-APPKIT_EXTERN NSString *const MPDocumentCurrentItemChangedNotification;
+FOUNDATION_EXPORT NSString *const MPDocumentCurrentItemChangedNotification;
+
+/**
+ *  Posted whenever a model change is initated via the user. This is mainly to broadcast changes
+ *  to an entry done via the ui throuhgout the app.
+ */
+FOUNDATION_EXPORT NSString *const MPDocumentWillChangeModelPropertyNotification;
+FOUNDATION_EXPORT NSString *const MPDocumentDidChangeModelPropertyNotification;
 
 /* Keys used in userInfo NSDictionaries on notifications */
-APPKIT_EXTERN NSString *const MPDocumentEntryKey;
-APPKIT_EXTERN NSString *const MPDocumentGroupKey;
+FOUNDATION_EXPORT NSString *const MPDocumentEntryKey;
+FOUNDATION_EXPORT NSString *const MPDocumentGroupKey;
 
 @class KPKGroup;
 @class KPKEntry;
@@ -57,7 +65,7 @@ APPKIT_EXTERN NSString *const MPDocumentGroupKey;
 @class KPKCompositeKey;
 @class KPKNode;
 
-@interface MPDocument : NSDocument <MPTargetNodeResolving>
+@interface MPDocument : NSDocument <MPTargetNodeResolving, MPModelChangeObserving>
 
 @property (nonatomic, readonly, assign) BOOL encrypted;
 @property (nonatomic, readonly, assign) NSUInteger unlockCount; // Amount of times the Document was unlocked;
@@ -70,7 +78,8 @@ APPKIT_EXTERN NSString *const MPDocumentGroupKey;
 @property (nonatomic, strong, readonly) KPKCompositeKey *compositeKey;
 
 @property (assign, readonly, getter = isReadOnly) BOOL readOnly;
-@property (nonatomic, readonly, assign) KPKVersion versionForFileType;
+@property (atomic, assign) BOOL shouldSaveOnLock;
+@property (nonatomic, readonly, assign) KPKDatabaseFormat formatForFileType;
 
 /*
  State (active group/entry)
@@ -83,13 +92,16 @@ APPKIT_EXTERN NSString *const MPDocumentGroupKey;
 
 /*
  Search - see MPDocument+Search for further details
+ 
+ FIXME: Document is pinned to mode bases search. Wrong design!
  */
 @property (nonatomic, readonly) BOOL hasSearch;
 @property (nonatomic, copy) MPEntrySearchContext *searchContext;
 @property (nonatomic, strong, readonly) NSArray *searchResult;
+@property (nonatomic, weak) KPKEntry *historyEntry;
 
-+ (KPKVersion)versionForFileType:(NSString *)fileType;
-+ (NSString *)fileTypeForVersion:(KPKVersion)version;
++ (KPKDatabaseFormat)formatForFileType:(NSString *)fileType;
++ (NSString *)fileTypeForVersion:(KPKDatabaseFormat)format;
 
 #pragma mark Lock/Decrypt
 - (IBAction)lockDatabase:(id)sender;
@@ -137,11 +149,13 @@ APPKIT_EXTERN NSString *const MPDocumentGroupKey;
 - (NSArray *)allEntries;
 - (NSArray *)allGroups;
 
-- (BOOL)shouldRecommendPasswordChange;
 - (BOOL)shouldEnforcePasswordChange;
+- (BOOL)shouldRecommendPasswordChange;
 
+- (void)importTree:(KPKTree *)tree;
 - (void)writeXMLToURL:(NSURL *)url;
 - (void)readXMLfromURL:(NSURL *)url;
+- (void)mergeWithContentsFromURL:(NSURL *)url key:(KPKCompositeKey *)key;
 
 /* Undoable Intiialization of elements */
 - (KPKGroup *)createGroup:(KPKGroup *)parent;
@@ -149,6 +163,7 @@ APPKIT_EXTERN NSString *const MPDocumentGroupKey;
 - (KPKAttribute *)createCustomAttribute:(KPKEntry *)entry;
 
 - (void)deleteNode:(KPKNode *)node;
+- (void)duplicateEntryWithOptions:(KPKCopyOptions)options;
 
 #pragma mark Actions
 /**
@@ -162,10 +177,8 @@ APPKIT_EXTERN NSString *const MPDocumentGroupKey;
  *  @param sender sender, that should respond to representedObject and return an NSUUID for the template to use
  */
 - (IBAction)createEntryFromTemplate:(id)sender;
-
 - (IBAction)duplicateEntry:(id)sender;
-
-- (IBAction)duplicateEntryWithOptions:(id)sender;
+- (IBAction)duplicateGroup:(id)sender;
 
 @end
 
@@ -212,32 +225,20 @@ APPKIT_EXTERN NSString *const MPDocumentGroupKey;
 @end
 
 #pragma mark -
-#pragma mark Edit Sessiong
-
-APPKIT_EXTERN NSString *const MPDocumentDidBeginEditingSelectedItem;
-APPKIT_EXTERN NSString *const MPDocumentDidCancelChangesToSelectedItem;
-APPKIT_EXTERN NSString *const MPDocumentDidCommitChangesToSelectedItem;
-
-@interface MPDocument (EditingSession)
-
-#pragma mark Edit Actions
-- (IBAction)beginEditingSelectedItem:(id)sender;
-- (IBAction)cancelChangesToSelectedItem:(id)sender;
-- (IBAction)commitChangesToSelectedItem:(id)sender;
-
-@end
-
-
-#pragma mark -
 #pragma mark History Browsing
 
-FOUNDATION_EXPORT NSString *const MPDocumentDidEnterHistoryNotification;
-FOUNDATION_EXPORT NSString *const MPDocumentDidExitHistoryNotification;
+/**
+ *  Posted by the document to signal a reqest for history display.
+ *  the userInfo dictionary has one key MPDocumentEntryKey with the entry to display the history for
+ */
+FOUNDATION_EXPORT NSString *const MPDocumentShowEntryHistoryNotification;
+FOUNDATION_EXPORT NSString *const MPDocumentHideEntryHistoryNotification;
 
-@interface MPDocument (HistoryBrowsing)
+@interface MPDocument (History)
 
-- (IBAction)showHistory:(id)sender;
-- (IBAction)exitHistory:(id)sender;
+- (IBAction)showEntryHistory:(id)sender;
+- (IBAction)hideEntryHistory:(id)sender;
+- (IBAction)revertEntry:(KPKEntry *)entry toEntry:(KPKEntry *)historyEntry;
 
 @end
 
@@ -258,7 +259,7 @@ FOUNDATION_EXTERN NSString *const MPDocumentDidChangeSearchResults;
 FOUNDATION_EXTERN NSString *const kMPDocumentSearchResultsKey;
 
 @interface MPDocument (Search)
-
+- (IBAction)perfromCustomSearch:(id)sender;
 - (void)enterSearchWithContext:(MPEntrySearchContext *)context;
 
 /* Should be called by the NSSearchTextField to update the search string */

@@ -5,15 +5,34 @@
 //  Created by Michael Starke on 27.07.13.
 //  Copyright (c) 2013 HicknHack Software GmbH. All rights reserved.
 //
+//  This program is free software: you can redistribute it and/or modify
+//  it under the terms of the GNU General Public License as published by
+//  the Free Software Foundation, either version 3 of the License, or
+//  (at your option) any later version.
+//
+//  This program is distributed in the hope that it will be useful,
+//  but WITHOUT ANY WARRANTY; without even the implied warranty of
+//
+//  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+//  GNU General Public License for more details.
+//
+//  You should have received a copy of the GNU General Public License
+//  along with this program.  If not, see <http://www.gnu.org/licenses/>.
+//
 
 #import "MPEntryInspectorViewController.h"
+#import "MPInspectorViewController.h"
 #import "MPAttachmentTableDataSource.h"
 #import "MPAttachmentTableViewDelegate.h"
 #import "MPCustomFieldTableViewDelegate.h"
 #import "MPPasswordCreatorViewController.h"
 #import "MPWindowAssociationsTableViewDelegate.h"
 #import "MPWindowTitleComboBoxDelegate.h"
+#import "MPTagsTokenFieldDelegate.h"
+#import "MPAutotypeBuilderViewController.h"
+#import "MPReferenceBuilderViewController.h"
 
+#import "MPPrettyPasswordTransformer.h"
 #import "NSString+MPPasswordCreation.h"
 
 #import "MPDocument.h"
@@ -23,6 +42,11 @@
 #import "MPTemporaryFileStorageCenter.h"
 #import "MPActionHelper.h"
 #import "MPSettingsHelper.h"
+#import "MPPasteBoardController.h"
+#import "MPContextButton.h"
+#import "MPAddCustomFieldContextMenuDelegate.h"
+
+#import "MPArrayController.h"
 
 #import "KeePassKit/KeePassKit.h"
 
@@ -31,7 +55,6 @@
 typedef NS_ENUM(NSUInteger, MPEntryTab) {
   MPEntryTabGeneral,
   MPEntryTabFiles,
-  MPEntryTabCustomFields,
   MPEntryTabAutotype
 };
 
@@ -39,32 +62,25 @@ typedef NS_ENUM(NSUInteger, MPEntryTab) {
 @private
   NSArrayController *_attachmentsController;
   NSArrayController *_customFieldsController;
-  NSArrayController *_windowAssociationsController;
+  MPArrayController *_windowAssociationsController;
   MPAttachmentTableViewDelegate *_attachmentTableDelegate;
   MPCustomFieldTableViewDelegate *_customFieldTableDelegate;
   MPAttachmentTableDataSource *_attachmentDataSource;
   MPWindowAssociationsTableViewDelegate *_windowAssociationsTableDelegate;
   MPWindowTitleComboBoxDelegate *_windowTitleMenuDelegate;
+  MPTagsTokenFieldDelegate *_tagTokenFieldDelegate;
+  MPAddCustomFieldContextMenuDelegate *_addCustomFieldContextMenuDelegate;
 }
 
 @property (nonatomic, assign) BOOL showPassword;
 @property (nonatomic, assign) MPEntryTab activeTab;
-@property (strong) NSPopover *activePopover;
-@property (strong) NSObjectController *entryController;
-@property (readonly, nonatomic) KPKEntry *contentEntry;
+@property (nonatomic, readonly) KPKEntry *representedEntry;
 
-
-//@property (nonatomic, weak) KPKEntry *entry;
 @property (strong) MPTemporaryFileStorage *quicklookStorage;
 
 @end
 
 @implementation MPEntryInspectorViewController
-
-static NSString *kMPContentBindingString1 = @"content.%@";
-static NSString *kMPContentBindingString2 = @"content.%@.%@";
-static NSString *kMPContentBindingString3 = @"content.%@.%@.%@";
-
 
 - (NSString *)nibName {
   return @"EntryInspectorView";
@@ -76,29 +92,32 @@ static NSString *kMPContentBindingString3 = @"content.%@.%@.%@";
     _showPassword = NO;
     _attachmentsController = [[NSArrayController alloc] init];
     _customFieldsController = [[NSArrayController alloc] init];
-    _windowAssociationsController = [[NSArrayController alloc] init];
+    _windowAssociationsController = [[MPArrayController alloc] init];
     _attachmentTableDelegate = [[MPAttachmentTableViewDelegate alloc] init];
     _customFieldTableDelegate = [[MPCustomFieldTableViewDelegate alloc] init];
     _attachmentDataSource = [[MPAttachmentTableDataSource alloc] init];
     _windowAssociationsTableDelegate = [[MPWindowAssociationsTableViewDelegate alloc] init];
     _windowTitleMenuDelegate = [[MPWindowTitleComboBoxDelegate alloc] init];
+    _tagTokenFieldDelegate = [[MPTagsTokenFieldDelegate alloc] init];
+    _addCustomFieldContextMenuDelegate = [[MPAddCustomFieldContextMenuDelegate alloc] init];
+    _tagTokenFieldDelegate.viewController = self;
     _attachmentTableDelegate.viewController = self;
     _customFieldTableDelegate.viewController = self;
+    _addCustomFieldContextMenuDelegate.viewController = self;
+    
     _activeTab = MPEntryTabGeneral;
-    _entryController = [[NSObjectController alloc] init];
-    _entryController.objectClass = [KPKEntry class];
   }
   return self;
 }
 
-- (KPKEntry *)contentEntry {
-  if([self.entryController.content isKindOfClass:[KPKEntry class]]) {
-    return self.entryController.content;
+- (KPKEntry *)representedEntry {
+  if([self.representedObject isKindOfClass:KPKEntry.class]) {
+    return self.representedObject;
   }
   return nil;
 }
 
-- (void)didLoadView {
+- (void)viewDidLoad {
   
   [self _addScrollViewWithView:self.generalView atTab:MPEntryTabGeneral];
   [self _addScrollViewWithView:self.autotypView atTab:MPEntryTabAutotype];
@@ -106,18 +125,41 @@ static NSString *kMPContentBindingString3 = @"content.%@.%@.%@";
   [self.infoTabControl bind:NSSelectedIndexBinding toObject:self withKeyPath:NSStringFromSelector(@selector(activeTab)) options:nil];
   [self.tabView bind:NSSelectedIndexBinding toObject:self withKeyPath:NSStringFromSelector(@selector(activeTab)) options:nil];
   
-  /* Set background to clearcolor so we can draw in the scrollview */
-  self.attachmentTableView.backgroundColor = [NSColor clearColor];
+  
+  self.attachmentTableView.backgroundColor = NSColor.clearColor;
   [self.attachmentTableView bind:NSContentBinding toObject:_attachmentsController withKeyPath:NSStringFromSelector(@selector(arrangedObjects)) options:nil];
   self.attachmentTableView.delegate = _attachmentTableDelegate;
   self.attachmentTableView.dataSource = _attachmentDataSource;
   [self.attachmentTableView registerForDraggedTypes:@[NSFilenamesPboardType]];
-  /* Set background to clearcolor so we can draw in the scrollview */
-  self.customFieldsTableView.backgroundColor = [NSColor clearColor];
+  [self.attachmentTableView setDraggingSourceOperationMask:NSDragOperationCopy forLocal:NO];
+  
+  /* extract custom field table view */
+  NSView *customFieldTableView = self.customFieldsTableView;
+  self.customFieldsTableView.translatesAutoresizingMaskIntoConstraints = NO;
+  [self.customFieldsTableView.enclosingScrollView removeFromSuperviewWithoutNeedingDisplay];
+  [self.customFieldsTableView removeFromSuperviewWithoutNeedingDisplay];
+  
+  [self.generalView addSubview:customFieldTableView];
+  
+  NSDictionary *dict = NSDictionaryOfVariableBindings(customFieldTableView, _tagsTokenField, _addCustomFieldButton);
+  [self.generalView addConstraints:[NSLayoutConstraint constraintsWithVisualFormat:@"H:|-16-[customFieldTableView]-16-|"
+                                                                           options:0
+                                                                           metrics:nil
+                                                                             views:dict]];
+  [self.generalView addConstraints:[NSLayoutConstraint constraintsWithVisualFormat:@"V:[_tagsTokenField]-[customFieldTableView]-[_addCustomFieldButton]"
+                                                                           options:0
+                                                                           metrics:nil
+                                                                             views:dict]];
+  
+  
+  
+  self.customFieldsTableView.backgroundColor = NSColor.clearColor;
   [self.customFieldsTableView bind:NSContentBinding toObject:_customFieldsController withKeyPath:NSStringFromSelector(@selector(arrangedObjects)) options:nil];
   self.customFieldsTableView.delegate = _customFieldTableDelegate;
   
-  self.windowAssociationsTableView.backgroundColor = [NSColor clearColor];
+  [self.customFieldsTableView sizeLastColumnToFit];
+  
+  self.windowAssociationsTableView.backgroundColor = NSColor.clearColor;
   self.windowAssociationsTableView.delegate = _windowAssociationsTableDelegate;
   [self.windowAssociationsTableView bind:NSContentBinding toObject:_windowAssociationsController withKeyPath:NSStringFromSelector(@selector(arrangedObjects)) options:nil];
   [self.windowAssociationsTableView bind:NSSelectionIndexesBinding toObject:_windowAssociationsController withKeyPath:NSSelectionIndexesBinding options:nil];
@@ -127,12 +169,10 @@ static NSString *kMPContentBindingString3 = @"content.%@.%@.%@";
   [self.passwordTextField bind:NSStringFromSelector(@selector(showPassword)) toObject:self withKeyPath:NSStringFromSelector(@selector(showPassword)) options:nil];
   [self.togglePassword bind:NSValueBinding toObject:self withKeyPath:NSStringFromSelector(@selector(showPassword)) options:nil];
   
+  self.tagsTokenField.delegate = _tagTokenFieldDelegate;
+  
+  [self _setupCustomFieldsButton];
   [self _setupViewBindings];
-}
-
-- (void)setupBindings:(MPDocument *)document {
-  [self.entryController bind:NSContentObjectBinding toObject:self withKeyPath:NSStringFromSelector(@selector(representedObject)) options:nil];
-  //  [self.entryController bind:NSContentObjectBinding toObject:document withKeyPath:NSStringFromSelector(@selector(selectedEntry)) options:nil];
 }
 
 - (void)registerNotificationsForDocument:(MPDocument *)document {
@@ -140,6 +180,11 @@ static NSString *kMPContentBindingString3 = @"content.%@.%@.%@";
                                            selector:@selector(_didAddEntry:)
                                                name:MPDocumentDidAddEntryNotification
                                              object:document];
+  _windowAssociationsController.observer = document;
+  [NSNotificationCenter.defaultCenter addObserver:self
+                                         selector:@selector(_didChangeCurrentItem:)
+                                             name:MPDocumentCurrentItemChangedNotification
+                                           object:document];
 }
 
 - (void)dealloc {
@@ -150,21 +195,25 @@ static NSString *kMPContentBindingString3 = @"content.%@.%@.%@";
 #pragma mark Actions
 
 - (void)addCustomField:(id)sender {
-  MPDocument *document = [[self windowController] document];
-  [document createCustomAttribute:self.entryController.content];
+  [self.observer willChangeModelProperty];
+  [self.windowController.document createCustomAttribute:self.representedObject];
+  [self.observer didChangeModelProperty];
 }
 - (void)removeCustomField:(id)sender {
-  NSUInteger index = [sender tag];
-  KPKAttribute *attribute = self.contentEntry.customAttributes[index];
-  [self.contentEntry removeCustomAttribute:attribute];
+  NSInteger rowIndex = [self.customFieldsTableView rowForView:sender];
+  NSAssert(rowIndex >= 0 && rowIndex < self.representedEntry.customAttributes.count, @"Invalid custom attribute index.");
+  KPKAttribute *attribute = self.representedEntry.customAttributes[rowIndex];
+  [self.observer willChangeModelProperty];
+  [self.representedEntry removeCustomAttribute:attribute];
+  [self.observer didChangeModelProperty];
 }
 
 - (void)saveAttachment:(id)sender {
-  NSInteger row = [self.attachmentTableView selectedRow];
+  NSInteger row = self.attachmentTableView.selectedRow;
   if(row < 0) {
     return; // No selection
   }
-  KPKBinary *binary = self.contentEntry.binaries[row];
+  KPKBinary *binary = self.representedEntry.binaries[row];
   NSSavePanel *savePanel = [NSSavePanel savePanel];
   savePanel.canCreateDirectories = YES;
   savePanel.nameFieldStringValue = binary.name;
@@ -185,11 +234,15 @@ static NSString *kMPContentBindingString3 = @"content.%@.%@.%@";
   openPanel.canChooseDirectories = NO;
   openPanel.canChooseFiles = YES;
   openPanel.allowsMultipleSelection = YES;
+  openPanel.prompt = NSLocalizedString(@"OPEN_BUTTON_ADD_ATTACHMENT_OPEN_PANEL", "Open button in the open panel to add attachments to an entry");
+  openPanel.message = NSLocalizedString(@"MESSAGE_ADD_ATTACHMENT_OPEN_PANEL", "Message in the open panel to add attachments to an entry");
   [openPanel beginSheetModalForWindow:self.windowController.window completionHandler:^(NSInteger result) {
     if(result == NSFileHandlingPanelOKButton) {
       for (NSURL *attachmentURL in openPanel.URLs) {
         KPKBinary *binary = [[KPKBinary alloc] initWithContentsOfURL:attachmentURL];
-        [self.contentEntry addBinary:binary];
+        [self.observer willChangeModelProperty];
+        [self.representedEntry addBinary:binary];
+        [self.observer didChangeModelProperty];
       }
     }
   }];
@@ -200,19 +253,28 @@ static NSString *kMPContentBindingString3 = @"content.%@.%@.%@";
   if(row < 0) {
     return; // no selection
   }
-  KPKBinary *binary = self.contentEntry.binaries[row];
-  [self.contentEntry removeBinary:binary];
+  KPKBinary *binary = self.representedEntry.binaries[row];
+  [self.observer willChangeModelProperty];
+  [self.representedEntry removeBinary:binary];
+  [self.observer didChangeModelProperty];
 }
 
 - (void)addWindowAssociation:(id)sender {
-  KPKWindowAssociation *associtation = [[KPKWindowAssociation alloc] initWithWindowTitle:NSLocalizedString(@"DEFAULT_WINDOW_TITLE", "") keystrokeSequence:nil];
-  [self.contentEntry.autotype addAssociation:associtation];
+  KPKWindowAssociation *associtation = [[KPKWindowAssociation alloc] initWithWindowTitle:NSLocalizedString(@"DEFAULT_WINDOW_TITLE", "Default window title for a new window association") keystrokeSequence:nil];
+  [self.observer willChangeModelProperty];
+  [self.representedEntry.autotype addAssociation:associtation];
+  [self.observer didChangeModelProperty];
 }
 
 - (void)removeWindowAssociation:(id)sender {
   NSInteger row = self.windowAssociationsTableView.selectedRow;
-  if(row > - 1 && row < [self.contentEntry.autotype.associations count]) {
-    [self.contentEntry.autotype removeAssociation:self.contentEntry.autotype.associations[row]];
+  if(row > - 1 && row < self.representedEntry.autotype.associations.count) {
+    [self.observer willChangeModelProperty];
+    KPKWindowAssociation *association = self.representedEntry.autotype.associations[row];
+    if(association) {
+      [self.representedEntry.autotype removeAssociation:association];
+      [self.observer didChangeModelProperty];
+    }
   }
 }
 
@@ -237,6 +299,8 @@ static NSString *kMPContentBindingString3 = @"content.%@.%@.%@";
     case MPActionToggleQuicklook: {
       BOOL enabled = [[NSUserDefaults standardUserDefaults] boolForKey:kMPSettingsKeyEnableQuicklookPreview];
       return enabled ? [self acceptsPreviewPanelControl:nil] : NO;
+    case MPActionRemoveAttachment:
+      return !self.representedEntry.isHistory;
     }
     default:
       return YES;
@@ -265,7 +329,7 @@ static NSString *kMPContentBindingString3 = @"content.%@.%@.%@";
 - (void)_updatePreviewItemForPanel:(QLPreviewPanel *)panel {
   NSInteger row = [self.attachmentTableView selectedRow];
   NSAssert(row > -1, @"Row needs to be selected");
-  KPKBinary *binary = self.contentEntry.binaries[row];
+  KPKBinary *binary = self.representedEntry.binaries[row];
   MPTemporaryFileStorage *oldStorage = (MPTemporaryFileStorage *)panel.dataSource;
   [[MPTemporaryFileStorageCenter defaultCenter] unregisterStorage:oldStorage];
   panel.dataSource = [[MPTemporaryFileStorageCenter defaultCenter] storageForBinary:binary];
@@ -274,46 +338,56 @@ static NSString *kMPContentBindingString3 = @"content.%@.%@.%@";
 #pragma mark -
 #pragma mark Popovers
 
-- (IBAction)_popUpPasswordGenerator:(id)sender {
-  [self.generatePasswordButton setEnabled:NO];
+- (IBAction)showReferenceBuilder:(id)sender {
+  NSView *location;
+  if([sender isKindOfClass:NSView.class]) {
+    location = sender;
+  }
+  else if([sender isKindOfClass:NSMenuItem.class]) {
+    location = [sender representedObject];
+  }
+  [self _showPopopver:[[MPReferenceBuilderViewController alloc] init] atView:location onEdge:NSMinYEdge];
+}
+
+- (IBAction)showAutotypeBuilder:(id)sender {
+  NSView *location;
+  if([sender isKindOfClass:NSButton.class]) {
+    location = sender;
+    [sender setEnabled:NO];
+  }
+  if([sender isKindOfClass:NSMenuItem.class]){
+    location = [sender representedObject];
+  }
+  MPAutotypeBuilderViewController *autotypeBuilder = [[MPAutotypeBuilderViewController alloc] init];
+  autotypeBuilder.representedObject = self.representedObject;
+  [self _showPopopver:autotypeBuilder atView:location onEdge:NSMinYEdge];
+}
+
+- (IBAction)showPasswordGenerator:(id)sender {
+  self.generatePasswordButton.enabled = NO;
   MPPasswordCreatorViewController *viewController = [[MPPasswordCreatorViewController alloc] init];
   viewController.allowsEntryDefaults = YES;
-  viewController.entry = self.contentEntry;
-  [self _showPopopver:viewController atView:self.passwordTextField onEdge:NSMinYEdge];
+  viewController.representedObject = self.representedObject;
+  viewController.observer = self.windowController.document;
+  [self _showPopopver:viewController atView:sender onEdge:NSMinYEdge];
+}
+
+- (void)dismissViewController:(NSViewController *)viewController {
+  if([viewController isKindOfClass:MPAutotypeBuilderViewController.class]) {
+    self.showCustomAssociationSequenceAutotypeBuilderButton.enabled = YES;
+    self.showCustomEntrySequenceAutotypeBuilderButton.enabled = YES;
+  }
+  else if([viewController isKindOfClass:MPPasswordCreatorViewController.class]) {
+    self.generatePasswordButton.enabled = YES;
+  }
+  [super dismissViewController:viewController];
 }
 
 - (void)_showPopopver:(NSViewController *)viewController atView:(NSView *)view onEdge:(NSRectEdge)edge {
-  if(_activePopover.contentViewController == viewController) {
-    return; // Do nothing, we already did show the controller
+  if([self.presentedViewControllers containsObject:viewController]) {
+    return;
   }
-  [_activePopover close];
-  NSAssert(_activePopover == nil, @"Popover hast to be niled out");
-  _activePopover = [[NSPopover alloc] init];
-  _activePopover.delegate = self;
-  _activePopover.behavior = NSPopoverBehaviorTransient;
-  if([viewController respondsToSelector:@selector(setCloseTarget:)]) {
-    [(id)viewController setCloseTarget:_activePopover];
-  }
-  _activePopover.contentViewController = viewController;
-  
-  [_activePopover showRelativeToRect:NSZeroRect ofView:view preferredEdge:edge];
-}
-
-- (void)popoverDidClose:(NSNotification *)notification {
-  /* We do not enable the button all the time, but it's working find this way */
-  [self.generatePasswordButton setEnabled:YES];
-  id controller = _activePopover.contentViewController;
-  /* Check for password wizzard */
-  if([controller respondsToSelector:@selector(generatedPassword)]) {
-    NSString *password = [controller generatedPassword];
-    /* We should only use the password if there is actually one */
-    if(password.length > 0) {
-      self.contentEntry.password = [controller generatedPassword];
-    }
-  }
-  /* TODO: Check for Icon wizard */
-  
-  _activePopover = nil;
+  [self presentViewController:viewController asPopoverRelativeToRect:NSZeroRect ofView:view preferredEdge:edge behavior:NSPopoverBehaviorSemitransient];
 }
 
 #pragma mark -
@@ -352,94 +426,116 @@ static NSString *kMPContentBindingString3 = @"content.%@.%@.%@";
                                                                    options:0
                                                                    metrics:nil
                                                                      views:views]];
+  [clipView addConstraints:[NSLayoutConstraint constraintsWithVisualFormat:@"V:|[view]"
+                                                                   options:0
+                                                                   metrics:nil
+                                                                     views:views]];
+  
   [[self view] layoutSubtreeIfNeeded];
 }
 
 #pragma mark -
 #pragma mark Entry Selection
 - (void)_setupViewBindings {
-  [self _bindEntry];
-  [self _bindAttachments];
-  [self _bindCustomFields];
-  [self _bindAutotype];
-}
-
-- (void)_bindEntry {
+  /* Disable for history view */
+  NSArray *inputs = @[self.titleTextField,
+                      self.passwordTextField,
+                      self.usernameTextField,
+                      self.URLTextField,
+                      self.expiresCheckButton,
+                      self.tagsTokenField,
+                      self.generatePasswordButton,
+                      self.addAttachmentButton,
+                      self.addCustomFieldButton,
+                      self.addWindowAssociationButton,
+                      self.removeWindowAssociationButton,
+                      self.enableAutotypeCheckButton,
+                      self.obfuscateAutotypeCheckButton,
+                      self.customEntrySequenceTextField,
+                      self.windowTitleComboBox,
+                      self.associationSequenceTextField];
+  
+  for(NSControl *control in inputs) {
+    [control bind:NSEnabledBinding
+         toObject:self
+      withKeyPath:[NSString stringWithFormat:@"%@.%@", NSStringFromSelector(@selector(representedObject)), NSStringFromSelector(@selector(isHistory))]
+          options:@{NSConditionallySetsEditableBindingOption: @NO, NSValueTransformerNameBindingOption: NSNegateBooleanTransformerName}];
+  }
+  
+  /* general */
+  NSDictionary *nullPlaceholderBindingOptionsDict = @{ NSNullPlaceholderBindingOption: NSLocalizedString(@"NONE", "Placeholder text for input fields if no entry or group is selected")};
   [self.titleTextField bind:NSValueBinding
-                   toObject:self.entryController
-                withKeyPath:[NSString stringWithFormat:kMPContentBindingString1, NSStringFromSelector(@selector(title))]
-                    options:@{ NSNullPlaceholderBindingOption: NSLocalizedString(@"NONE", "")} ];
+                   toObject:self
+                withKeyPath:[NSString stringWithFormat:@"%@.%@", NSStringFromSelector(@selector(representedObject)), NSStringFromSelector(@selector(title))]
+                    options:nullPlaceholderBindingOptionsDict];
   [self.passwordTextField bind:NSValueBinding
-                      toObject:self.entryController
-                   withKeyPath:[NSString stringWithFormat:kMPContentBindingString1, NSStringFromSelector(@selector(password))]
-                       options:@{ NSNullPlaceholderBindingOption: NSLocalizedString(@"NONE", "") }];
+                      toObject:self
+                   withKeyPath:[NSString stringWithFormat:@"%@.%@", NSStringFromSelector(@selector(representedObject)), NSStringFromSelector(@selector(password))]
+                       options:nullPlaceholderBindingOptionsDict];
   [self.usernameTextField bind:NSValueBinding
-                      toObject:self.entryController
-                   withKeyPath:[NSString stringWithFormat:kMPContentBindingString1, NSStringFromSelector(@selector(username))]
-                       options:@{ NSNullPlaceholderBindingOption: NSLocalizedString(@"NONE", "") }];
+                      toObject:self
+                   withKeyPath:[NSString stringWithFormat:@"%@.%@", NSStringFromSelector(@selector(representedObject)), NSStringFromSelector(@selector(username))]
+                       options:nullPlaceholderBindingOptionsDict];
   [self.URLTextField bind:NSValueBinding
-                 toObject:self.entryController
-              withKeyPath:[NSString stringWithFormat:kMPContentBindingString1, NSStringFromSelector(@selector(url))]
-                  options:@{ NSNullPlaceholderBindingOption: NSLocalizedString(@"NONE", "")}];
-
-  
-  
+                 toObject:self
+              withKeyPath:[NSString stringWithFormat:@"%@.%@", NSStringFromSelector(@selector(representedObject)), NSStringFromSelector(@selector(url))]
+                  options:nullPlaceholderBindingOptionsDict];
   [self.expiresCheckButton bind:NSTitleBinding
-                       toObject:self.entryController
-                    withKeyPath:[NSString stringWithFormat:kMPContentBindingString2, NSStringFromSelector(@selector(timeInfo)), NSStringFromSelector(@selector(expirationDate))]
-                        options:@{ NSValueTransformerNameBindingOption:MPExpiryDateValueTransformer }];
+                       toObject:self
+                    withKeyPath:[NSString stringWithFormat:@"%@.%@.%@", NSStringFromSelector(@selector(representedObject)), NSStringFromSelector(@selector(timeInfo)), NSStringFromSelector(@selector(expirationDate))]
+                        options:@{ NSValueTransformerNameBindingOption:MPExpiryDateValueTransformerName }];
   [self.expiresCheckButton bind:NSValueBinding
-                       toObject:self.entryController
-                    withKeyPath:[NSString stringWithFormat:kMPContentBindingString2, NSStringFromSelector(@selector(timeInfo)), NSStringFromSelector(@selector(expires))]
+                       toObject:self
+                    withKeyPath:[NSString stringWithFormat:@"%@.%@.%@", NSStringFromSelector(@selector(representedObject)), NSStringFromSelector(@selector(timeInfo)), NSStringFromSelector(@selector(expires))]
                         options:nil];
+  
   [self.tagsTokenField bind:NSValueBinding
-                   toObject:self.entryController
-                withKeyPath:[NSString stringWithFormat:kMPContentBindingString1, NSStringFromSelector(@selector(tags))]
-                    options:nil];
+                   toObject:self
+                withKeyPath:[NSString stringWithFormat:@"%@.%@", NSStringFromSelector(@selector(representedObject)), NSStringFromSelector(@selector(tags))]
+                    options:nullPlaceholderBindingOptionsDict];
+  
+  
   [self.uuidTextField bind:NSValueBinding
-                  toObject:self.entryController
-               withKeyPath:[NSString stringWithFormat:kMPContentBindingString2, NSStringFromSelector(@selector(uuid)), NSStringFromSelector(@selector(UUIDString))]
+                  toObject:self
+               withKeyPath:[NSString stringWithFormat:@"%@.%@.%@", NSStringFromSelector(@selector(representedObject)), NSStringFromSelector(@selector(uuid)), NSStringFromSelector(@selector(UUIDString))]
                    options:@{ NSConditionallySetsEditableBindingOption: @NO }];
   self.uuidTextField.editable = NO;
   
-  /*for(id item in items) {
-   [item bind:NSEnabledBinding toObject:self.entryController withKeyPath:NSStringFromSelector(@selector(isEditable)) options:nil];
-   }*/
-}
-
-- (void)_bindAttachments {
+  /* Attachments */
   [_attachmentsController bind:NSContentArrayBinding
-                      toObject:self.entryController
-                   withKeyPath:[NSString stringWithFormat:kMPContentBindingString1, NSStringFromSelector(@selector(binaries))]
+                      toObject:self
+                   withKeyPath:[NSString stringWithFormat:@"%@.%@", NSStringFromSelector(@selector(representedObject)), NSStringFromSelector(@selector(binaries))]
                        options:nil];
-}
-
-- (void)_bindCustomFields {
-  [_customFieldsController bind:NSContentArrayBinding
-                       toObject:self.entryController
-                    withKeyPath:[NSString stringWithFormat:kMPContentBindingString1, NSStringFromSelector(@selector(customAttributes))]
-                        options:nil];
-}
--  (void)_bindAutotype {
   
+  /* CustomField */
+  [_customFieldsController bind:NSContentArrayBinding
+                       toObject:self
+                    withKeyPath:[NSString stringWithFormat:@"%@.%@", NSStringFromSelector(@selector(representedObject)), NSStringFromSelector(@selector(customAttributes))]
+                        options:nil];
+  
+  /* Autotype */
   [self.enableAutotypeCheckButton bind:NSValueBinding
-                              toObject:self.entryController
-                           withKeyPath:[NSString stringWithFormat:kMPContentBindingString2, NSStringFromSelector(@selector(autotype)), NSStringFromSelector(@selector(isEnabled))] options:nil];
+                              toObject:self
+                           withKeyPath:[NSString stringWithFormat:@"%@.%@.%@", NSStringFromSelector(@selector(representedObject)), NSStringFromSelector(@selector(autotype)), NSStringFromSelector(@selector(enabled))] options:nil];
   [self.obfuscateAutotypeCheckButton bind:NSValueBinding
-                                 toObject:self.entryController
-                              withKeyPath:[NSString stringWithFormat:kMPContentBindingString2, NSStringFromSelector(@selector(autotype)), NSStringFromSelector(@selector(obfuscateDataTransfer))]
+                                 toObject:self
+                              withKeyPath:[NSString stringWithFormat:@"%@.%@.%@", NSStringFromSelector(@selector(representedObject)), NSStringFromSelector(@selector(autotype)), NSStringFromSelector(@selector(obfuscateDataTransfer))]
                                   options:nil];
-  [self.customEntrySequenceTextField bind:NSEnabledBinding
-                                 toObject:self.entryController
-                              withKeyPath:[NSString stringWithFormat:kMPContentBindingString2, NSStringFromSelector(@selector(autotype)), NSStringFromSelector(@selector(isEnabled))]
+  
+  /* Use enabled2 since NSEnabledBinding is already bound! */
+  [self.customEntrySequenceTextField bind:@"enabled2"
+                                 toObject:self
+                              withKeyPath:[NSString stringWithFormat:@"%@.%@.%@", NSStringFromSelector(@selector(representedObject)), NSStringFromSelector(@selector(autotype)), NSStringFromSelector(@selector(enabled))]
                                   options:nil];
+  
+  
   [self.customEntrySequenceTextField bind:NSValueBinding
-                                 toObject:self.entryController
-                              withKeyPath:[NSString stringWithFormat:kMPContentBindingString2, NSStringFromSelector(@selector(autotype)), NSStringFromSelector(@selector(defaultKeystrokeSequence))]
+                                 toObject:self
+                              withKeyPath:[NSString stringWithFormat:@"%@.%@.%@", NSStringFromSelector(@selector(representedObject)), NSStringFromSelector(@selector(autotype)), NSStringFromSelector(@selector(defaultKeystrokeSequence))]
                                   options:@{ NSValidatesImmediatelyBindingOption: @YES }];
   [_windowAssociationsController bind:NSContentArrayBinding
-                             toObject:self.entryController
-                          withKeyPath:[NSString stringWithFormat:kMPContentBindingString2, NSStringFromSelector(@selector(autotype)), NSStringFromSelector(@selector(associations))]
+                             toObject:self
+                          withKeyPath:[NSString stringWithFormat:@"%@.%@.%@", NSStringFromSelector(@selector(representedObject)), NSStringFromSelector(@selector(autotype)), NSStringFromSelector(@selector(associations))]
                               options:@{ NSSelectsAllWhenSettingContentBindingOption: @NO }];
   [self.windowTitleComboBox setStringValue:@""];
   [self.windowTitleComboBox bind:NSValueBinding
@@ -451,20 +547,91 @@ static NSString *kMPContentBindingString3 = @"content.%@.%@.%@";
                                  toObject:_windowAssociationsController
                               withKeyPath:[NSString stringWithFormat:@"selection.%@", NSStringFromSelector(@selector(keystrokeSequence))]
                                   options:nil];
+  
+  
 }
 
-- (void)_toggleEditing:(BOOL)edit {
-  NSArray <NSTextField *> *textFields = @[self.titleTextField,
-                                          self.usernameTextField,
-                                          self.URLTextField,
-                                          self.passwordTextField,
-                                          self.tagsTokenField
-                                          /*self.createdTextField,
-                                           self.modifiedTextField*/
-                                          ];
-  for(NSTextField *t in textFields) {
-    t.editable = edit;
-    t.selectable = edit;
+- (void)_setupCustomFieldsButton {
+  /* FIXME: this is a bug in MPContextButton preventing the image set in IB to be used */
+  [self.addCustomFieldButton setImage:[NSImage imageNamed:NSImageNameAddTemplate]];
+  NSMenu *customFieldMenu = [[NSMenu alloc] initWithTitle:NSLocalizedString(@"ADD_CUSTOM_FIELD_CONTEXT_MENU", @"Menu displayed for adding special custom keys")];
+  customFieldMenu.delegate = _addCustomFieldContextMenuDelegate;
+  self.addCustomFieldButton.contextMenu = customFieldMenu;
+}
+
+#pragma mark -
+#pragma mark HNHUITextFieldDelegate
+- (BOOL)textField:(NSTextField *)textField allowServicesForTextView:(NSTextView *)textView {
+  /* disallow servies for password fields */
+  if(textField == self.passwordTextField) {
+    return NO;
+  }
+  NSInteger index = MPCustomFieldIndexFromTag(textField.tag);
+  if(index > -1) {
+    KPKAttribute *attribute = _customFieldsController.arrangedObjects[index];
+    return !attribute.protect;
+  }
+  return YES;
+}
+
+- (NSMenu *)textField:(NSTextField *)textField textView:(NSTextView *)view menu:(NSMenu *)menu {
+  for(NSMenuItem *item in menu.itemArray) {
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wundeclared-selector"
+    if(item.action == @selector(_searchWithGoogleFromMenu:) || item.action == @selector(submenuAction:)) {
+      [menu removeItem:item];
+    }
+#pragma clang diagnostic pop
+  }
+  return menu;
+}
+
+/*- (NSArray<NSString *> *)control:(NSControl *)control textView:(NSTextView *)textView completions:(NSArray<NSString *> *)words forPartialWordRange:(NSRange)charRange indexOfSelectedItem:(NSInteger *)index {
+  return @[ @"{USERNAME}", @"{PASSWORD}", @"{URL}", @"{TITLE}" ];
+}
+*/
+
+- (BOOL)textField:(NSTextField *)textField textView:(NSTextView *)textView performAction:(SEL)action {
+  if(action == @selector(copy:)) {
+    MPPasteboardOverlayInfoType info = MPPasteboardOverlayInfoCustom;
+    NSMutableString *selectedValue = [[NSMutableString alloc] init];
+    for(NSValue *rangeValue in textView.selectedRanges) {
+      [selectedValue appendString:[textView.string substringWithRange:rangeValue.rangeValue]];
+    }
+    NSString *name = @"";
+    if(selectedValue.length == 0) {
+      return YES;
+    }
+    if(textField == self.usernameTextField) {
+      info = MPPasteboardOverlayInfoUsername;
+    }
+    else if(textField == self.passwordTextField) {
+      info = MPPasteboardOverlayInfoPassword;
+    }
+    else if(textField == self.URLTextField) {
+      info = MPPasteboardOverlayInfoURL;
+    }
+    else if(textField == self.uuidTextField) {
+      name = NSLocalizedString(@"UUID", "Displayed name when uuid field was copied");
+    }
+    else if(textField == self.titleTextField) {
+      name = NSLocalizedString(@"TITLE", "Displayed name when title field was copied");
+    }
+    else {
+      NSInteger index = MPCustomFieldIndexFromTag(textField.tag);
+      if(index > -1) {
+        name = [_customFieldsController.arrangedObjects[index] key];
+      }
+    }
+    [MPPasteBoardController.defaultController copyObjects:@[selectedValue] overlayInfo:info name:name atView:self.view];
+    return NO;
+  }
+  return YES;
+}
+
+- (IBAction)toggleExpire:(NSButton*)sender {
+  if([sender state] == NSOnState && [self.representedEntry.timeInfo.expirationDate isEqualToDate:[NSDate distantFuture]]) {
+    [NSApp sendAction:self.pickExpireDateButton.action to:nil from:self.pickExpireDateButton];
   }
 }
 
@@ -474,6 +641,11 @@ static NSString *kMPContentBindingString3 = @"content.%@.%@.%@";
 - (void)_didAddEntry:(NSNotification *)notification {
   [self.tabView selectTabViewItemAtIndex:MPEntryTabGeneral];
   [self.titleTextField becomeFirstResponder];
+}
+
+- (void)_didChangeCurrentItem:(NSNotification *)notificiation {
+  self.showPassword = NO;
+  //self.customFieldsTableView.needsDisplay = YES;
 }
 
 @end

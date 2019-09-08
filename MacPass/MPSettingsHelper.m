@@ -5,6 +5,20 @@
 //  Created by Michael Starke on 30.03.13.
 //  Copyright (c) 2013 HicknHack Software GmbH. All rights reserved.
 //
+//  This program is free software: you can redistribute it and/or modify
+//  it under the terms of the GNU General Public License as published by
+//  the Free Software Foundation, either version 3 of the License, or
+//  (at your option) any later version.
+//
+//  This program is distributed in the hope that it will be useful,
+//  but WITHOUT ANY WARRANTY; without even the implied warranty of
+//
+//  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+//  GNU General Public License for more details.
+//
+//  You should have received a copy of the GNU General Public License
+//  along with this program.  If not, see <http://www.gnu.org/licenses/>.
+//
 
 #import "MPSettingsHelper.h"
 #import "NSString+MPPasswordCreation.h"
@@ -14,10 +28,15 @@
 
 NSString *const kMPSettingsKeyPasteboardClearTimeout                  = @"ClipboardClearTimeout";
 NSString *const kMPSettingsKeyClearPasteboardOnQuit                   = @"ClearClipboardOnQuit";
+NSString *const kMPSettingsKeyPreventUniversalClipboard               = @"PreventUniversalClipboard";
 NSString *const kMPSettingsKeyBrowserBundleId                         = @"BrowserBundleId";
 NSString *const kMPSettingsKeyOpenEmptyDatabaseOnLaunch               = @"OpenEmptyDatabaseOnLaunch";
 NSString *const kMPSettingsKeyReopenLastDatabaseOnLaunch              = @"ReopenLastDatabaseOnLaunch";
+NSString *const kMPSettingsKeyQuitOnLastWindowClose                   = @"QuitOnLastWindowClose";
+NSString *const kMPSettingsKeyFileChangeStrategy                      = @"FileChangeStrategy";
+NSString *const kMPSettingsKeyEnableAutosave                          = @"EnableAutosave";
 NSString *const kMPSettingsKeyLockOnSleep                             = @"LockOnSleep";
+NSString *const kMPSettingskeyLockOnLogout                            = @"LockOnLogout";
 NSString *const kMPSettingsKeyIdleLockTimeOut                         = @"IdleLockTimeOut";
 NSString *const kMPSettingsKeyShowInspector                           = @"ShowInspector";
 NSString *const kMPSettingsKeyEntryTableSortDescriptors               = @"EntryTableSortDescriptors";
@@ -40,6 +59,7 @@ NSString *const kMPSettingsKeyAutotypeMatchTitle                      = @"Autoty
 NSString *const kMPSettingsKeyAutotypeMatchURL                        = @"AutotypeMatchURL";
 NSString *const kMPSettingsKeyAutotypeMatchHost                       = @"AutotypeMatchHost";
 NSString *const kMPSettingsKeyAutotypeMatchTags                       = @"AutotypeMatchTags";
+NSString *const kMPSettingsKeyAutotpyeHideMissingPermissionsWarning   = @"AutotpyeHideMissingPermissionsWarning";
 
 NSString *const kMPSettingsKeyEntrySearchFilterContext                = @"EntrySearchFilterContext";
 
@@ -47,9 +67,9 @@ NSString *const kMPSettingsKeyEnableQuicklookPreview                  = @"Enable
 
 NSString *const kMPSettingsKeyCopyGeneratedPasswordToClipboard        = @"CopyGeneratedPasswordToClipboard";
 
-NSString *const kMPSettingsKeyDefaultPasswordRounds                   = @"KeyDefaultPasswordRounds";
 NSString *const kMPSettingsKeyDefaultPasswordLength                   = @"DefaultPasswordLength";
 NSString *const kMPSettingsKeyPasswordCharacterFlags                  = @"PasswordCharacterFlags";
+NSString *const kMPSettingsKeyPasswordEnsureOccurance                 = @"PasswordEnsureOccurance";
 NSString *const kMPSettingsKeyPasswordUseCustomString                 = @"PasswordUseCustomString";
 NSString *const kMPSettingsKeyPasswordCustomString                    = @"PasswordCustomString";
 
@@ -57,8 +77,14 @@ NSString *const kMPSettingsKeyPasswordDefaultsForEntry                = @"Passwo
 
 NSString *const kMPSettingsKeyDoubleClickURLAction                    = @"DoubleClickURLAction";
 NSString *const kMPSettingsKeyDoubleClickTitleAction                  = @"DoubleClickTitleAction";
+NSString *const kMPSettingsKeyUpdatePasswordOnTemplateEntries         = @"UpdatePasswordOnTemplateEntries";
+NSString *const kMPSettingsKeyHideAfterCopyToClipboard                = @"HideAfterCopyToClipboard";
 
-NSString *const kMPSettingsKeyLoadUnsecurePlugins                     = @"MPLoadUnsecurePlugins";
+NSString *const kMPSettingsKeyLoadUnsecurePlugins                     = @"LoadUnsecurePlugins";
+NSString *const kMPSettingsKeyLoadIncompatiblePlugins                 = @"LoadIncompatiblePlugins";
+NSString *const kMPSettingsKeyDisabledPlugins                         = @"DisabledPlugins";
+NSString *const kMPSettingsKeyHideIncopatiblePluginsWarning           = @"HideIncopatiblePluginsWarning";
+NSString *const kMPSettingsKeyAllowRemoteFetchOfPluginRepository      = @"AllowRemoteFetchOfPluginRepository";
 
 /* Deprecated */
 NSString *const kMPDeprecatedSettingsKeyRememberKeyFilesForDatabases      = @"kMPSettingsKeyRememberKeyFilesForDatabases";
@@ -69,7 +95,9 @@ NSString *const kMPDeprecatedSettingsKeyEntrySearchFilterMode             = @"En
 NSString *const kMPDeprecatedSettingsKeyHttpPort                          = @"HttpPort";
 NSString *const kMPDeprecatedSettingsKeyEnableHttpServer                  = @"EnableHttpServer";
 NSString *const kMPDeprecatedSettingsKeyShowMenuItem                      = @"ShowMenuItem";
-
+NSString *const kMPDeprecatedSettingsKeyDefaultPasswordRounds             = @"KeyDefaultPasswordRounds";
+NSString *const kMPDepricatedSettingsKeyLoadUnsecurePlugins               = @"MPLoadUnsecurePlugins";
+NSString *const kMPDepricatedSettingsKeyAutotypeHideAccessibiltyWarning   = @"AutotypeHideAccessibiltyWarning";
 
 @implementation MPSettingsHelper
 
@@ -82,6 +110,7 @@ NSString *const kMPDeprecatedSettingsKeyShowMenuItem                      = @"Sh
   [self _migrateURLDoubleClickPreferences];
   [self _migrateEntrySearchFlags];
   [self _migrateRememberedKeyFiles];
+  [self _migrateLoadUnsecurePlugins];
   [self _removeDeprecatedValues];
 }
 
@@ -97,9 +126,12 @@ NSString *const kMPDeprecatedSettingsKeyShowMenuItem                      = @"Sh
                          kMPSettingsKeyShowInspector: @YES, // Show the Inspector by default
                          kMPSettingsKeyPasteboardClearTimeout: @30, // 30 seconds
                          kMPSettingsKeyClearPasteboardOnQuit: @YES,
+                         kMPSettingsKeyPreventUniversalClipboard: @YES, // Disable Universal Clipboard by default
                          kMPSettingsKeyOpenEmptyDatabaseOnLaunch: @NO,
                          kMPSettingsKeyReopenLastDatabaseOnLaunch: @YES,
+                         kMPSettingsKeyFileChangeStrategy: @(MPFileChangeStrategyAsk), // Ask what to do on a file change!
                          kMPSettingsKeyLockOnSleep: @YES,
+                         kMPSettingskeyLockOnLogout: @NO,
                          kMPSettingsKeyIdleLockTimeOut: @0, // 5 minutes
                          kMPSettingsKeyLegacyHideNotes: @NO,
                          kMPSettingsKeyLegacyHidePassword: @YES,
@@ -109,7 +141,7 @@ NSString *const kMPDeprecatedSettingsKeyShowMenuItem                      = @"Sh
                          kMPSettingsKeyRememberKeyFilesForDatabases: @NO,
                          kMPSettingsKeySendCommandForControlKey: @YES,
                          kMPSettingsKeyEnableGlobalAutotype: @NO,
-                         kMPSettingsKeyGlobalAutotypeKeyDataKey: [[DDHotKey defaultHotKey] keyData],
+                         kMPSettingsKeyGlobalAutotypeKeyDataKey: DDHotKey.defaultHotKeyData,
                          kMPSettingsKeyDefaultGlobalAutotypeSequence: @"{USERNAME}{TAB}{PASSWORD}{ENTER}",
                          kMPSettingsKeyAutotypeMatchTitle: @YES,
                          kMPSettingsKeyAutotypeMatchURL: @NO,
@@ -117,14 +149,20 @@ NSString *const kMPDeprecatedSettingsKeyShowMenuItem                      = @"Sh
                          kMPSettingsKeyAutotypeMatchTags: @NO,
                          kMPSettingsKeyEnableQuicklookPreview: @NO,
                          kMPSettingsKeyCopyGeneratedPasswordToClipboard: @NO,
-                         kMPSettingsKeyDefaultPasswordRounds: @50000,
                          kMPSettingsKeyDefaultPasswordLength: @12,
                          kMPSettingsKeyPasswordCharacterFlags: @(MPPasswordCharactersAll),
                          kMPSettingsKeyPasswordUseCustomString: @NO,
                          kMPSettingsKeyPasswordCustomString: @"",
+                         kMPSettingsKeyPasswordEnsureOccurance: @NO,
                          kMPSettingsKeyDoubleClickURLAction: @(MPDoubleClickURLActionCopy),
                          kMPSettingsKeyDoubleClickTitleAction: @(MPDoubleClickTitleActionInspect),
-                         kMPSettingsKeyLoadUnsecurePlugins: @NO
+                         kMPSettingsKeyLoadUnsecurePlugins: @NO,
+                         kMPSettingsKeyUpdatePasswordOnTemplateEntries: @YES,
+                         kMPSettingsKeyDisabledPlugins: @[],
+                         kMPSettingsKeyLoadIncompatiblePlugins: @NO,
+                         kMPSettingsKeyQuitOnLastWindowClose: @NO,
+                         kMPSettingsKeyEnableAutosave: @YES,
+                         kMPSettingsKeyHideAfterCopyToClipboard: @NO
                          };
   });
   return standardDefaults;
@@ -139,10 +177,13 @@ NSString *const kMPDeprecatedSettingsKeyShowMenuItem                      = @"Sh
                             kMPDeprecatedSettingsKeyDocumentsAutotypeFixNoteWasShown,
                             kMPDeprecatedSettingsKeyDoubleClickURLToLaunch,
                             kMPDeprecatedSettingsKeyEntrySearchFilterMode,
+                            kMPDeprecatedSettingsKeyDefaultPasswordRounds,
                             /* Moved to KeePassHttp Plugin */
                             kMPDeprecatedSettingsKeyHttpPort,
                             kMPDeprecatedSettingsKeyEnableHttpServer,
-                            kMPDeprecatedSettingsKeyShowMenuItem
+                            kMPDeprecatedSettingsKeyShowMenuItem,
+                            kMPDepricatedSettingsKeyLoadUnsecurePlugins,
+                            kMPDepricatedSettingsKeyAutotypeHideAccessibiltyWarning
                             ];
   });
   return deprecatedSettings;
@@ -203,7 +244,7 @@ NSString *const kMPDeprecatedSettingsKeyShowMenuItem                      = @"Sh
 + (void)_migrateRememberedKeyFiles {
   /*
    Database file paths was stored as plain text in keyfile mapping.
-   We only need to store the key file ulr in plain text, thus hashing the path is sufficent
+   We only need to store the key file url in plain text, thus hashing the path is sufficent
    */
   NSDictionary<NSString *, NSString *> *currentMapping = [[NSUserDefaults standardUserDefaults] dictionaryForKey:kMPSettingsKeyRememeberdKeysForDatabases];
   if(!currentMapping) {
@@ -221,7 +262,7 @@ NSString *const kMPDeprecatedSettingsKeyShowMenuItem                      = @"Sh
         didHash = YES;
       }
     }
-    /* keep all hasehd or unknown data */
+    /* keep all hashed or unknown data */
     else {
       hashedDict[key] = currentMapping[key];
     }
@@ -229,6 +270,18 @@ NSString *const kMPDeprecatedSettingsKeyShowMenuItem                      = @"Sh
   if(didHash) {
     [[NSUserDefaults standardUserDefaults] setObject:hashedDict forKey:kMPSettingsKeyRememeberdKeysForDatabases];
   }
+}
+
++ (void)_migrateLoadUnsecurePlugins {
+  id value = [NSUserDefaults.standardUserDefaults objectForKey:kMPDepricatedSettingsKeyLoadUnsecurePlugins];
+  if(!value) {
+    return; // value already migrated or was set to default value
+  }
+  BOOL oldValue = [NSUserDefaults.standardUserDefaults boolForKey:kMPDepricatedSettingsKeyLoadUnsecurePlugins];
+  if(oldValue != [[self _standardDefaults][kMPDepricatedSettingsKeyLoadUnsecurePlugins] boolValue]) {
+    [NSUserDefaults.standardUserDefaults setBool:oldValue forKey:kMPSettingsKeyLoadUnsecurePlugins];
+  }
+  
 }
 
 @end

@@ -2,6 +2,8 @@
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
+	<key>NSAppleEventsUsageDescription</key>
+	<string>MacPass might use AppleEvents to perform Autotype functionality</string>
 	<key>CFBundleDevelopmentRegion</key>
 	<string>en</string>
 	<key>CFBundleDocumentTypes</key>
@@ -14,7 +16,7 @@
 			<key>CFBundleTypeIconFile</key>
 			<string>FileTypeIcon</string>
 			<key>CFBundleTypeName</key>
-			<string>kdbxFileType</string>
+			<string>KDBX Database</string>
 			<key>CFBundleTypeRole</key>
 			<string>Editor</string>
 			<key>LSItemContentTypes</key>
@@ -34,7 +36,7 @@
 			<key>CFBundleTypeIconFile</key>
 			<string>FileTypeIcon</string>
 			<key>CFBundleTypeName</key>
-			<string>kdbFileType</string>
+			<string>KDB Database</string>
 			<key>CFBundleTypeRole</key>
 			<string>Editor</string>
 			<key>LSItemContentTypes</key>
@@ -58,21 +60,27 @@
 	<key>CFBundlePackageType</key>
 	<string>APPL</string>
 	<key>CFBundleShortVersionString</key>
-	<string>0.6.2</string>
+	<string>${CURRENT_PROJECT_VERSION}</string>
 	<key>CFBundleSignature</key>
 	<string>????</string>
 	<key>CFBundleVersion</key>
 	<string>UNDEFINED</string>
 	<key>LSMinimumSystemVersion</key>
 	<string>${MACOSX_DEPLOYMENT_TARGET}</string>
+	<key>MPHelpURL</key>
+	<string>https://github.com/MacPass/MacPass</string>
+	<key>MPPluginRepositoryURL</key>
+	<string>https://macpassapp.org/data/plugins.json</string>
 	<key>NSHumanReadableCopyright</key>
-	<string>Copyright © 2012-2016 HicknHack Software GmbH. All rights reserved.</string>
+	<string>Copyright © 2012-2019 HicknHack Software GmbH. All rights reserved.</string>
 	<key>NSMainNibFile</key>
 	<string>MainMenu</string>
 	<key>NSPrincipalClass</key>
 	<string>NSApplication</string>
 	<key>NSSupportsAutomaticGraphicsSwitching</key>
 	<true/>
+	<key>NSUserNotificationAlertStyle</key>
+	<string>banner</string>
 	<key>SUFeedURL</key>
 	<string>https://raw.githubusercontent.com/MacPass/MacPassUpdates/master/appcast_macpass.xml</string>
 	<key>UTExportedTypeDeclarations</key>
@@ -83,7 +91,7 @@
 				<string>public.data</string>
 			</array>
 			<key>UTTypeDescription</key>
-			<string>Keepass 2 Database</string>
+			<string>KDBX Database</string>
 			<key>UTTypeIdentifier</key>
 			<string>com.hicknhack.macpass.kdbx</string>
 			<key>UTTypeTagSpecification</key>
@@ -100,7 +108,7 @@
 				<string>public.data</string>
 			</array>
 			<key>UTTypeDescription</key>
-			<string>Keepass Database</string>
+			<string>KDB Database</string>
 			<key>UTTypeIdentifier</key>
 			<string>com.hicknhack.macpass.kdb</string>
 			<key>UTTypeTagSpecification</key>
@@ -129,6 +137,17 @@
 					<string>mpPlugIn</string>
 				</array>
 			</dict>
+		</dict>
+	</array>
+	<key>UTImportedTypeDeclarations</key>
+	<array>
+		<dict>
+			<key>UTTypeDescription</key>
+			<string>XML</string>
+			<key>UTTypeIdentifier</key>
+			<string>public.xml</string>
+			<key>UTTypeTagSpecification</key>
+			<dict/>
 		</dict>
 	</array>
 </dict>

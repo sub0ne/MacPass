@@ -5,6 +5,20 @@
 //  Created by Michael Starke on 09.03.13.
 //  Copyright (c) 2013 HicknHack Software GmbH. All rights reserved.
 //
+//  This program is free software: you can redistribute it and/or modify
+//  it under the terms of the GNU General Public License as published by
+//  the Free Software Foundation, either version 3 of the License, or
+//  (at your option) any later version.
+//
+//  This program is distributed in the hope that it will be useful,
+//  but WITHOUT ANY WARRANTY; without even the implied warranty of
+//
+//  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+//  GNU General Public License for more details.
+//
+//  You should have received a copy of the GNU General Public License
+//  along with this program.  If not, see <http://www.gnu.org/licenses/>.
+//
 
 #import <Foundation/Foundation.h>
 
@@ -14,9 +28,13 @@ typedef NS_ENUM(NSUInteger, MPActionType) {
   MPActionAddGroup, // Add a new group
   MPActionDuplicateEntry, // Simply duplicate an entry (including history)
   MPActionDuplicateEntryWithOptions, // Request user input on what to duplicate
+  MPActionDuplicateGroup, // Duplicate the group and all it's children
+  MPActionReverToHistoryEntry, // Restore an entry to an older state in history
   MPActionDelete, // Delete entry or group
   MPActionCopyUsername, // copy username to pasteboard
   MPActionCopyPassword, // copy password to pasteboard
+  MPActionCopyCustomAttribute, // copy a custom attribute to the pasteboard
+  MPActionCopyAsReference, // copy a reference to the attribute {REF:…} to the pasteboard
   MPActionCopyURL, // copy url to pasteboard
   MPActionOpenURL, // open url in default browser
   MPActionToggleInspector,
@@ -28,9 +46,11 @@ typedef NS_ENUM(NSUInteger, MPActionType) {
   MPActionExportXML, // Export as XML
   MPActionImportXML, // Import form XML
   MPActionToggleQuicklook,
-  MPActionShowHistory, // show history 
-  MPActionExitHistory, // exit history
-  MPActionPerformAutotypeForSelectedEntry // Perform Autotype for selected Entry
+  MPActionShowEntryHistory, // show history
+  MPActionHideEntryHistory, // exit history
+  MPActionShowGroupInOutline, // show the group (of the entry) in the outline view
+  MPActionPerformAutotypeForSelectedEntry, // Perform Autotype for selected Entry
+  MPActionRemoveAttachment // Remove an attachment
 };
 /**
  *	Helper to retrieve commonly used actions
