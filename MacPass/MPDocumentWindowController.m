@@ -122,6 +122,11 @@ typedef void (^MPPasswordChangedBlock)(BOOL didChangePassword);
   self.toolbar = [[NSToolbar alloc] initWithIdentifier:@"MainWindowToolbar"];
   self.toolbar.autosavesConfiguration = YES;
   self.toolbar.allowsUserCustomization = YES;
+  if (@available(macOS 10.14, *)) {
+    self.toolbar.centeredItemIdentifier = MPToolbarItemIdentifierSearch;
+  } else {
+    // to not do any magic here
+  }
   self.toolbar.delegate = self.toolbarDelegate;
   self.window.toolbar = self.toolbar;
   self.toolbarDelegate.toolbar = self.toolbar;
@@ -279,12 +284,12 @@ typedef void (^MPPasswordChangedBlock)(BOOL didChangePassword);
   }];
 }
 
-- (void)importFromPlugin:(id)sender {
+- (void)importWithPlugin:(id)sender {
   if(![sender isKindOfClass:NSMenuItem.class]) {
     return;
   }
   NSMenuItem *menuItem = sender;
-  if(![menuItem.representedObject isKindOfClass:NSDictionary.class]) {
+  if(![menuItem.representedObject isKindOfClass:NSString.class]) {
     return;
   }
   
@@ -292,12 +297,39 @@ typedef void (^MPPasswordChangedBlock)(BOOL didChangePassword);
   if(!sheetWindow) {
     return;
   }
-  MPPlugin<MPImportPlugin> *importPlugin;
+  NSString *bundleIdentifier = menuItem.representedObject;
+  MPPlugin<MPImportPlugin> *importPlugin = (MPPlugin<MPImportPlugin> *)[MPPluginHost.sharedHost pluginWithBundleIdentifier:bundleIdentifier];
   NSOpenPanel *openPanel = NSOpenPanel.openPanel;
   [importPlugin prepareOpenPanel:openPanel];
   [openPanel beginSheetModalForWindow:sheetWindow completionHandler:^(NSModalResponse result) {
-    KPKTree *importedTree = [importPlugin treeForRunningOpenPanel:openPanel withResponse:result];
-    [self.document importTree:importedTree];
+    if(result == NSModalResponseOK) {
+      KPKTree *importedTree = [importPlugin treeForRunningOpenPanel:openPanel];
+      [self.document importTree:importedTree];
+    }
+  }];
+}
+
+- (void)exportWithPlugin:(id)sender {
+  if(![sender isKindOfClass:NSMenuItem.class]) {
+    return;
+  }
+  NSMenuItem *menuItem = sender;
+  if(![menuItem.representedObject isKindOfClass:NSString.class]) {
+    return;
+  }
+  
+  NSWindow *sheetWindow = ((MPDocument *)self.document).windowForSheet;
+  if(!sheetWindow) {
+    return;
+  }
+  NSString *bundleIdentifier = menuItem.representedObject;
+  MPPlugin<MPExportPlugin> *exportPlugin = (MPPlugin<MPExportPlugin> *)[MPPluginHost.sharedHost pluginWithBundleIdentifier:bundleIdentifier];
+  NSSavePanel *savePanel = NSSavePanel.savePanel;
+  [exportPlugin prepareSavePanel:savePanel];
+  [savePanel beginSheetModalForWindow:sheetWindow completionHandler:^(NSModalResponse result) {
+    if(result == NSModalResponseOK) {
+      [exportPlugin exportTree:((MPDocument *)self.document).tree forRunningSavePanel:savePanel];
+    }
   }];
 }
 
@@ -464,7 +496,7 @@ typedef void (^MPPasswordChangedBlock)(BOOL didChangePassword);
   id<MPTargetNodeResolving> entryResolver = [NSApp targetForAction:@selector(currentTargetEntries)];
   NSArray *entries = entryResolver.currentTargetEntries;
   if(entries.count == 1) {
-    [[MPAutotypeDaemon defaultDaemon] performAutotypeForEntry:entries.firstObject];
+    [MPAutotypeDaemon.defaultDaemon performAutotypeForEntry:entries.firstObject];
   }
 }
 
